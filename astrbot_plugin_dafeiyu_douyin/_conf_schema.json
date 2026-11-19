@@ -1,0 +1,137 @@
+{
+  "enabled": {
+    "type": "bool",
+    "description": "总开关：关掉后既不自动发，也不往对话里注入周记",
+    "default": true
+  },
+  "owner_qq": {
+    "type": "string",
+    "description": "发给谁（你的 QQ 号）",
+    "default": "969733712"
+  },
+  "platform_id": {
+    "type": "string",
+    "description": "AstrBot 里这个 QQ 平台的名字，用来拼会话 id",
+    "default": "大肥鱼"
+  },
+  "reports_dir": {
+    "type": "string",
+    "description": "抖音插件写日报的目录（不要改，除非你搬过）",
+    "default": "C:\\Users\\96973\\.dsh\\douyin-browser\\memory\\reports\\videos"
+  },
+  "state_dir": {
+    "type": "string",
+    "description": "本插件的状态与周记存放目录",
+    "default": "C:\\Users\\96973\\.dsh\\douyin-bridge"
+  },
+  "send_time": {
+    "type": "string",
+    "description": "每天几点发（HH:MM，24 小时制）",
+    "default": "21:30"
+  },
+  "max_items": {
+    "type": "int",
+    "description": "一次最多说几条作品",
+    "default": 2
+  },
+  "send_link": {
+    "type": "bool",
+    "description": "是否在消息后面附作品链接",
+    "default": true
+  },
+  "weekly_weekday": {
+    "type": "int",
+    "description": "周记在周几做（0=周一 … 6=周日）",
+    "default": 6
+  },
+  "weekly_time": {
+    "type": "string",
+    "description": "周记几点做（HH:MM）",
+    "default": "20:00"
+  },
+  "notify_weekly": {
+    "type": "bool",
+    "description": "周记做完要不要给你发一句",
+    "default": true
+  },
+  "inject_weekly": {
+    "type": "bool",
+    "description": "把最近的周记注入她的对话（当作她自己的见闻）",
+    "default": true
+  },
+  "inject_days": {
+    "type": "int",
+    "description": "周记在多少天内还算新鲜",
+    "default": 14
+  },
+  "persona_id": {
+    "type": "string",
+    "description": "用哪个人格来写这些话",
+    "default": "大肥鱼"
+  },
+  "auto_publish": {
+    "type": "bool",
+    "description": "每晚生成草案后自动发布（关掉就只存草稿，发布仍要你点）",
+    "default": true
+  },
+  "publish_index": {
+    "type": "int",
+    "description": "自动发布第几条草案（0 开始，默认第 1 条）",
+    "default": 0
+  },
+  "auto_save_draft": {
+    "type": "bool",
+    "description": "关闭自动发布时，是否把第 1 条存进抖音草稿箱",
+    "default": true
+  },
+  "draft_time": {
+    "type": "string",
+    "description": "每天几点生成草案并自动发布（HH:MM，24 小时制）",
+    "default": "15:00"
+  },
+  "digest_time": {
+    "type": "string",
+    "description": "每天几点重建 QQ↔抖音 共享摘要",
+    "default": "20:50"
+  },
+  "stats_time": {
+    "type": "string",
+    "description": "每天几点回捞作品数据",
+    "default": "21:00"
+  },
+  "weekly_daily": {
+    "type": "bool",
+    "description": "每天生成草案前刷新一次口味周记（周日仍会单独发一份汇总）",
+    "default": true
+  },
+  "use_video": {
+    "type": "bool",
+    "description": "每天发视频（9:16，带语音字幕）；关掉则回到图文",
+    "default": true
+  },
+  "comment_time_1": {
+    "type": "string",
+    "description": "每天第一个回评论的时间（HH:MM）",
+    "default": "12:30"
+  },
+  "comment_time_2": {
+    "type": "string",
+    "description": "每天第二个回评论的时间（HH:MM）",
+    "default": "20:30"
+  },
+  "follow_enabled": {
+    "type": "bool",
+    "description": "允许主人让她回关粉丝（默认开；只在主人明确要求时执行）",
+    "default": true
+  },
+  "follow_daily_limit": {
+    "type": "int",
+    "description": "每天最多回关几个粉丝（防批量）",
+    "default": 5
+  },
+  "follow_batch_limit": {
+    "type": "int",
+    "description": "单次最多回关几个（默认 3）",
+    "default": 3
+  }
+}
