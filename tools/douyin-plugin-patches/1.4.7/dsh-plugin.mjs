@@ -180,12 +180,12 @@ export async function apply(ctx, config = {}) {
   const getController = () => {
     if (disposed) throw new Error('抖音插件已卸载。');
     // 调度器复用延迟创建的控制器；只有实际观看或已许可回复需要浏览器。
-    controllerPromise ??= import('./core.mjs?v=21')
+    controllerPromise ??= import('./core.mjs?v=23')
       .then(({ BrowserController }) => new BrowserController({ ...config, source: 'dsh', personaMemory: sharedPersona }))
       .catch((error) => { controllerPromise = undefined; throw error; });
     return controllerPromise;
   };
-  const {PersonaMemory}=await import('./persona-memory.mjs?v=11');
+  const {PersonaMemory}=await import('./persona-memory.mjs?v=13');
   const sharedPersona=new PersonaMemory();
   const personaBinding=bindNativePersonaContext(ctx,{workspacePaths:[path.dirname(resolveRuntimePaths().memoryDir),path.dirname(fileURLToPath(import.meta.url))],getPersonaMemory:()=>{
     // 提示词读取不触发浏览器或模型，按每次生成时的文件内容刷新。

@@ -117,3 +117,21 @@ python F:\program_all\dsh\dafeiyu\tools\patch_douyin_plugin.py --restore  # 出�
 
 顺带修正的 import 版本号：`core.mjs?v=11→13`（chat-browser / chat-service / comment-browser / video-forward），
 `core.mjs?v=19→21`（dsh-plugin）。
+
+## 8. persona-memory.mjs · 长视频看十几秒就划走，永远学不出负反馈
+
+现象：11-22 凌晨那轮 14 条观测里，5 条 1200–1600 秒的美食合集只看了 7–11 秒就 skip，
+`watchRatio` 只有 1%–8%，但按原阈值全落 `neutral`——`quickSkipSeconds:3` 管不到它（秒数超过 3），
+`engagedRatio:0.7` 也够不上（比例太低）。结果长视频既不记正向也不记负向，兴趣永远学不出来。
+
+改：`BEHAVIOR_THRESHOLDS` 加 `shallowRatio: 0.15`；判定链在 `early-skip` 之后补一档
+
+```js
+else if (row.actions.skip && actualWatched >= BEHAVIOR_THRESHOLDS.engagedSeconds && watchRatio < BEHAVIOR_THRESHOLDS.shallowRatio) {
+  signal = 'dislike'; basisCode = 'shallow-skip';
+  basis = `已核对观看 ${watchedSeconds} 秒（${Math.round(watchRatio * 100)}%）就跳过，只看了开头一点。`;
+}
+```
+
+离线复算全部历史（59 个作品）：before like 26 / dislike 1 / neutral 40 → after like 26 / dislike 18 / neutral 35。
+`persona-memory.mjs?v=11→12`（core.mjs:12、dsh-plugin.mjs:188）。

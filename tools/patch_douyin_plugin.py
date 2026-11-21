@@ -18,6 +18,7 @@
   4 comment-browser 推荐流没有 /video 路由时以 data-aweme-id 为准
   5 public-comment-agent 生成正文先清洗，仍违规就放弃（不再让整轮失败）
   6 各模块 import 的 ?v=N 已递增，重启即加载新代码
+  7 core.mjs 换片：读不到身份不再当成「作品已换」；persona-memory 加「看满 8 秒但比例很低就 skip」判负向
 """
 from __future__ import annotations
 
@@ -41,6 +42,7 @@ FILES = [
     "autonomous-watch.mjs",
     "core.mjs",
     "dsh-plugin.mjs",
+    "persona-memory.mjs",
 ]
 
 

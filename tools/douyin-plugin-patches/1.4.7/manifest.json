@@ -1,10 +1,10 @@
 {
   "package": "dsh-douyin-browser-local",
   "version": "1.4.7",
-  "created": "2026-11-22T00:20:00",
+  "created": "2026-11-22T00:40:00",
   "files": {
     "comment-browser.mjs": {
-      "sha256": "40bb4ac7432e0d3381e65f60e6ae299921a3af9b3ede6266a1352bee5a2c7b72",
+      "sha256": "949c3e51568bbcfbb29cbd4183684b22092982cc69fcc4a7abe902d8d500a3db",
       "bytes": 60623
     },
     "watch-mode.mjs": {
@@ -20,12 +20,16 @@
       "bytes": 59855
     },
     "core.mjs": {
-      "sha256": "312493ae462e3f464ccb7762abc91e0973573cd2bac5dd07e6e4d31f0111e95b",
+      "sha256": "33a04cd76ceaed30a94fd901a4c9caadfcdcc65935aff9ec990af18692c278eb",
       "bytes": 143182
     },
     "dsh-plugin.mjs": {
-      "sha256": "45de85f8a1f49a4a0426a635b62daaa9f8c5eeae48d0bc659bce2ff71223f967",
+      "sha256": "2de12f626e5fd5e9d08a57410cac5de96422aeee92c43544de7fae2d0d88fce9",
       "bytes": 20182
+    },
+    "persona-memory.mjs": {
+      "sha256": "47290705d13f225d6b05ba62fdbd0343a9f924a5e00f152af66694eeb31f6867",
+      "bytes": 36919
     }
   }
 }

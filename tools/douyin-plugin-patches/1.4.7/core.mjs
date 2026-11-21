@@ -9,7 +9,7 @@ import { MemoryStore } from './memory.mjs?v=2';
 import { TOOL_DEFINITIONS, validateToolArguments } from './tool-definitions.mjs?v=18';
 import { VideoLimits } from './video-limits.mjs';
 import { resolveRuntimePaths, resolveNodeExecutable } from './runtime-paths.mjs?v=10';
-import { PersonaMemory } from './persona-memory.mjs?v=11';
+import { PersonaMemory } from './persona-memory.mjs?v=13';
 import { BrowserLauncher, connectDedicatedBrowser } from './browser-launcher.mjs';
 import { pauseExistingVideoPages } from './browser-pause.mjs';
 import { browserPageLabel, browserPageLock, findSharedPage, adoptSharedPreparePage } from './browser-pages.mjs';
