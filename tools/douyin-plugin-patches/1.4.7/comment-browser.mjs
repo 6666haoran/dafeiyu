@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as waitForCommentTick } from 'node:timers/promises';
-import { BrowserController, readPageState } from './core.mjs?v=9';
+import { BrowserController, readPageState } from './core.mjs?v=13';
 import { VideoLimits } from './video-limits.mjs';
 import { resolveRuntimePaths } from './runtime-paths.mjs';
 import { validateCommentText } from './autonomous-comments.mjs';

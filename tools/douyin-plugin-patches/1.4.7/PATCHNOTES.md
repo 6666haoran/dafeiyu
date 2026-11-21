@@ -81,3 +81,39 @@ python F:\program_all\dsh\dafeiyu\tools\patch_douyin_plugin.py --restore  # 出�
 - 图文作品的「回复」按钮在网页端是 0×0 隐藏元素，只能回视频作品；
 - 评论正文是另一路 LLM 生成的（`api-agent.mjs` 明确 comment 不接受外部正文），所以只能清洗、不能预设；
 - 这套补丁绑定 1.4.7 的文件内容；版本变了脚本不会硬覆盖，只报告「版本不符，请对照本文手工改」。
+
+## 7. core.mjs · 换片把「这一帧核不上」当成「作品已换」，整轮停摆
+
+现象：自主观看每次跑到下一次换片就停，`watch-state.json` 里
+`lastError` = 「未确认切换到另一条就绪作品，已停止自主观看。」，
+`lastSwitchDiagnostic.reasonCode` = `video-changed-before-input`、`changed:false`，before/after 的 idHash 完全相同
+——即作品根本没换，是被判成「换了」。
+
+根因链（用 CDP 探针实测确认）：
+
+- `page state` 里把「可见」当成有效，推荐流角落的小窗/预览也是可见的 → `candidateCount` 常年 >1；
+- `checkPendingInput()` 拿 `readIdentity()` 的 null 与 `beforeIdentity` 比较，`null !== 'video:…'` 直接判「作品已换」；
+- 页面内的输入见证 `inspectSwitchInput` 的 listener 同样是 `currentIdentity() !== expectedIdentity` 就
+  `preventDefault()+stopImmediatePropagation()`，把点击吞掉。
+
+为什么不是「点击坐标不对」：受信点击 `[data-e2e="video-switch-next-arrow"]` 实测能换片
+（duration 11.19→21.71），滚轮 deltaY 150 也能换；最小化窗口后输入照样生效。问题只在核对环节。
+
+改（四处，都在 `core.mjs`）：
+
+1. `checkPendingInput()` 里身份为 null 时重读，最多 **10 次 × 250ms**；重读后仍然是 null 就**放行**
+   （`if(currentIdentity===null){before=current;return true;}`）——读不到只说明这一帧核不上，
+   不等于作品换了，输入瞬间还有见证会再核对一次；
+2. 身份串变了但核对出的作品 id 还是同一条（旁侧冒出直播预览/预载视频都会换掉身份串）时同样放行：
+   `const sameWorkId=Boolean(currentWorkId)&&(expectedVideoId!==undefined?currentWorkId===expectedVideoId:currentWorkId===beforeWorkId);`
+3. `inspectSwitchInput` 的见证改成**只有明确读到别的作品才拦**：
+   `const liveIdentity=currentIdentity(); if(!targetMatches||(liveIdentity!==null&&liveIdentity!==expectedIdentity)){…blocked…}`；
+4. `readPageState()` 的 video 候选加面积门槛，把角落小窗剔掉：主画面 ≥64000px² 时只保留
+   `area >= 64000` 的候选，避免 `candidateCount>1` 成为常态。
+
+实测（2026-11-22 00:15，真机）：连续 3 次 `switchVideo(1)` 全部 `changed:true`、`switchConfirm:"stable"`；
+随后一整轮 `/watch/start` 跑满 21 次请求（`dailyRequests` 30→满），期间 14 条连续观测、14 次换片全部成功，
+最后只因当天请求额度用尽而 `limited`——**不再是换片失败**。
+
+顺带修正的 import 版本号：`core.mjs?v=11→13`（chat-browser / chat-service / comment-browser / video-forward），
+`core.mjs?v=19→21`（dsh-plugin）。

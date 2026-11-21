@@ -9,7 +9,7 @@ import { MemoryStore } from './memory.mjs?v=2';
 import { TOOL_DEFINITIONS, validateToolArguments } from './tool-definitions.mjs?v=18';
 import { VideoLimits } from './video-limits.mjs';
 import { resolveRuntimePaths, resolveNodeExecutable } from './runtime-paths.mjs?v=10';
-import { PersonaMemory } from './persona-memory.mjs?v=10';
+import { PersonaMemory } from './persona-memory.mjs?v=11';
 import { BrowserLauncher, connectDedicatedBrowser } from './browser-launcher.mjs';
 import { pauseExistingVideoPages } from './browser-pause.mjs';
 import { browserPageLabel, browserPageLock, findSharedPage, adoptSharedPreparePage } from './browser-pages.mjs';
@@ -318,10 +318,13 @@ export function readPageState() {
   };
   const noteRoots=[...document.querySelectorAll('[data-e2e="note-detail"],[data-e2e="image-detail"]')].filter(visible),noteRoot=noteRoots.length===1&&/^\/(?:video|note)\/\d+/.test(location.pathname)?noteRoots[0]:null;
   const notePlayer=noteRoot?.querySelector('[data-e2e="player-container"].note-detail-container')||noteRoot;
-  const videoElements = [...document.querySelectorAll('video')].filter(e=>videoVisible(e)&&!e.closest(privateArea)&&(!notePlayer||notePlayer.contains(e))).map(element => {
+  const allVideoElements = [...document.querySelectorAll('video')].filter(e=>videoVisible(e)&&!e.closest(privateArea)&&(!notePlayer||notePlayer.contains(e))).map(element => {
     const r = element.getBoundingClientRect();
     return { element, area: Math.max(0, Math.min(innerWidth, r.right) - Math.max(0, r.left)) * Math.max(0, Math.min(innerHeight, r.bottom) - Math.max(0, r.top)) };
   }).sort((a,b) => b.area - a.area);
+  // 推荐流会在角落里挂小窗/预览；只要主画面够大，就把明显偏小的候选剔掉，别把「当前作品不唯一」当常态。
+  const mainArea = allVideoElements[0]?.area ?? 0;
+  const videoElements = mainArea >= 64000 ? allVideoElements.filter(item => item.area >= 64000) : allVideoElements;
   const element = videoElements[0]?.element;
   const text = [...document.querySelectorAll('body *')].filter(e => e.childElementCount === 0 && visible(e) && !e.closest('[data-e2e="im-dialog"],[data-e2e="conversation-item"]')).map(e => clean(e.innerText || e.textContent)).filter(Boolean).join('\n').slice(-9000);
   const loginRequired = /扫码登录|验证码登录|登录后即可|手机扫码登录/.test(text);
@@ -594,7 +597,7 @@ export class BrowserController {
     return this.personaMemory;
   }
   getChatService() {
-    this.chatPromise??=Promise.all([import('./chat-browser.mjs?v=18'),import('./chat-service.mjs?v=18'),import('./usage-ledger.mjs')])
+    this.chatPromise??=Promise.all([import('./chat-browser.mjs?v=19'),import('./chat-service.mjs?v=19'),import('./usage-ledger.mjs')])
       .then(([{ChatBrowser},{ChatService},{UsageLedger}])=>{const stateDir=this.limits().stateDir,source=this.source==='dsh'?'dsh':'api';const service=new ChatService({stateDir,browser:new ChatBrowser({source:source==='dsh'?'dsh-chat':'api-chat'}),onPrepared:options=>this.releaseIdlePreparePage(options),observeSharedWork:input=>this.observeSharedWork(input),videoLimits:this.limits()});service.agent.personaMemory=this.getPersonaMemory();service.agent.getMemoryStore=()=>this.store();service.agent.createConversationMemory=({scopeToken,messages})=>{const contact=memoryContactFromToken(scopeToken);return createRuntimeConversationMemory({store:this.store(),contact,messages,host:source==='dsh'?'dsh':'desktop',isAuthorized:()=>service.isMemoryScopeAuthorized(contact)});};service.agent.usageLedger=new UsageLedger({stateDir});service.agent.source=source;return service;})
       .catch(error=>{this.chatPromise=null;throw error;});
     return this.chatPromise;
@@ -951,7 +954,11 @@ export class BrowserController {
       const currentIdentity=()=>{
         if(protectedPage())return null;
         const notes=[...document.querySelectorAll('[data-e2e="note-detail"],[data-e2e="image-detail"]')].filter(visible),note=notes.length===1&&/^\/(?:note|video)\/\d+/.test(location.pathname)?notes[0]:null,notePlayer=note?.querySelector('[data-e2e="player-container"].note-detail-container')||note;
-        const candidates=[...document.querySelectorAll('video')].filter(video=>{if(!visible(video)||video.closest(privateArea)||notePlayer&&!notePlayer.contains(video))return false;for(let node=video;node;node=node.parentElement)if(Number(getComputedStyle(node).opacity)===0)return false;return true;}).map(video=>{
+        const candidates=[...document.querySelectorAll('video')].filter(video=>{if(!visible(video)||video.closest(privateArea)||notePlayer&&!notePlayer.contains(video))return false;for(let node=video;node;node=node.parentElement)if(Number(getComputedStyle(node).opacity)===0)return false;
+          // 页面角落的小窗/预览也是「可见」的，会把当前作品判成不唯一；按面积把明显的小窗剔掉。
+          const vr=video.getBoundingClientRect(),vArea=Math.max(0,Math.min(innerWidth,vr.right)-Math.max(0,vr.left))*Math.max(0,Math.min(innerHeight,vr.bottom)-Math.max(0,vr.top));
+          if(vArea<Math.max(64000,innerWidth*innerHeight*0.1))return false;
+          return true;}).map(video=>{
           const active=video.closest('[data-e2e="feed-active-video"],[data-e2e="video-detail"]');let root=active;
           if(!root){root=video.parentElement;for(let i=0;root?.parentElement&&i<8;i++){if(root.querySelector('[class*="video-info-detail"]'))break;root=root.parentElement;}}
           const playerId=/(?:^|\s)video_(\d+)(?:\s|$)/.exec(video.closest('[data-e2e="player-container"]')?.className??'')?.[1],activeId=/(?:^|\s)video_(\d+)(?:\s|$)/.exec(active?.className??'')?.[1];
@@ -1004,7 +1011,9 @@ export class BrowserController {
         if(!entry.armed||!event.isTrusted)return;
         if(entry.expired){entry.blocked=true;event.preventDefault();event.stopImmediatePropagation();if(event.type===(element?'click':'wheel')){entry.armed=false;entry.cleanup();delete entries[currentToken];}return;}
         const target=event.target instanceof Element?event.target:null,targetMatches=element?target&&(target===element||element.contains(target)):target?.closest('[data-e2e="feed-active-video"],[data-e2e="feed-live-card"],[data-e2e="feed-live"],[data-e2e="video-detail"],[data-e2e="player-container"]');
-        if(!targetMatches||currentIdentity()!==expectedIdentity){entry.blocked=true;event.preventDefault();event.stopImmediatePropagation();return;}
+        // 读不到身份只表示这一帧核不上，不是「作品已换」；只有明确读到别的作品才拦截，否则正常放行这次输入。
+        const liveIdentity=currentIdentity();
+        if(!targetMatches||(liveIdentity!==null&&liveIdentity!==expectedIdentity)){entry.blocked=true;event.preventDefault();event.stopImmediatePropagation();return;}
         if(event.type===(element?'click':'wheel')){entry.dispatched=true;entry.armed=false;}
       };
       for(const type of types)document.addEventListener(type,listener,{capture:true,passive:false});
@@ -1056,14 +1065,25 @@ export class BrowserController {
     const denied=(state,reasonCode)=>({changed:false,before:state.video,after:state.video,state,reasonCode});
     const checkPendingInput=async()=>{
       aborted(signal);await this.checkVideoLimits(direction>0?'douyin_next':'douyin_previous');aborted(signal);
-      const current=await this.state(),currentIdentity=await readIdentity(current);aborted(signal);
+      let current=await this.state(),currentIdentity=await readIdentity(current);aborted(signal);
+      // 页面预载/换片动画的瞬间会短暂读不到身份；重读几次再判断，避免把「瞬断」当成「作品已换」而整轮停摆。
+      for(let identityRetry=0;identityRetry<10&&!blocked(current)&&currentIdentity===null;identityRetry++){
+        await wait(250,signal);current=await this.state();currentIdentity=await readIdentity(current);aborted(signal);
+      }
       if(blocked(current)){inputDenied=denied(current,'switch-blocked');return false;}
+      // 重读后仍然读不到身份，只说明此刻无法核对，不等于作品已换：输入瞬间还有身份见证会再核对一次，这里放行而不是整轮停摆。
+      if(currentIdentity===null){before=current;return true;}
       if(currentIdentity!==beforeIdentity){
+        // 身份串变了但核对出来的作品还是同一条（旁侧冒出的直播预览、预载视频都会把身份串换掉），
+        // 这不算「作品已换」；放行让输入瞬间的身份见证再核对一次。
+        const currentWorkId=current.video?.id||current.imagePost?.id,beforeWorkId=before.video?.id||before.imagePost?.id;
+        const sameWorkId=Boolean(currentWorkId)&&(expectedVideoId!==undefined?currentWorkId===expectedVideoId:currentWorkId===beforeWorkId);
+        if(sameWorkId){before=current;return true;}
         if(expectedVideoId!==undefined&&currentIdentity?.startsWith('video:')&&current.video.id!==expectedVideoId){
           await wait(300,signal);await this.checkVideoLimits(direction>0?'douyin_next':'douyin_previous');const confirmed=await this.state();
           const confirmedIdentity=await readIdentity(confirmed);aborted(signal);
           inputDenied=confirmedIdentity===currentIdentity?{...denied(confirmed,'observed-video-changed'),staleObservation:true,expectedVideoId}:denied(confirmed,'video-changed-before-input');
-        }else inputDenied=denied(current,'video-changed-before-input');
+        }else inputDenied={...denied(current,'video-changed-before-input'),currentIdentity,beforeIdentity,currentVideoId:current.video?.id??null,candidateCount:current.videoSelection?.candidateCount??null};
         return false;
       }
       before=current;return true;
