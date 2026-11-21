@@ -30,12 +30,20 @@ INK = (58, 52, 44)
 GREY = (150, 141, 126)
 
 
-def cover(img, w, h):
+def cover(img, w, h, anchor=None):
+    """铺满 w×h。
+
+    竖图放进横向照片框时，居中裁切会把人的脸切掉（脸通常在上三分之一），
+    所以竖直方向按 anchor 取：0=贴顶、0.5=居中。竖图默认 0.06，横图/方图仍居中。
+    """
     iw, ih = img.size
+    if anchor is None:
+        anchor = 0.06 if ih / iw > 1.15 else 0.5
     s = max(w / iw, h / ih)
     img = img.resize((int(iw * s + 0.5), int(ih * s + 0.5)), Image.LANCZOS)
     left = (img.width - w) // 2
-    top = (img.height - h) // 2
+    top = int((img.height - h) * anchor)
+    top = max(0, min(top, img.height - h))
     return img.crop((left, top, left + w, top + h))
 
 
@@ -218,13 +226,9 @@ def main():
         page.save(DIR / name, quality=92)
         out.append(str(DIR / name))
 
-    if args.gallery:
-        used_path = SHARED / "used-images.json"
-        used = json.loads(used_path.read_text(encoding="utf-8")) if used_path.exists() else {}
-        today = __import__("datetime").datetime.now().strftime("%Y-%m-%d")
-        for k in picks[: args.pages]:
-            used[str(k)] = today
-        used_path.write_text(json.dumps(used, ensure_ascii=False, indent=1), encoding="utf-8")
+    # 注意：这里不写 used-images.json。
+    # 排版只是「试着渲染」，真正发出去才算用过；由 post_today.mjs 在发布成功后记账，
+    # 否则调一次样式就把四张图全标成用过，图库几天就被烧光。
 
     meta = {
         "index": args.index,

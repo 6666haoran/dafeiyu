@@ -16,9 +16,14 @@ function conn(u){const ws=new WebSocket(u);let id=0;const p=new Map();
  return {ws,ready,send};}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-const data=JSON.parse(fs.readFileSync(DRAFTS,'utf8'));
-const d=data.drafts[idx];
-if(!d||!d.card) throw new Error('没有草案或配图');
+const useGallery=args.includes('--gallery');
+const GDIR='F:\\program_all\\dsh\\dafeiyu\\shared\\drafts';
+const data=useGallery?null:JSON.parse(fs.readFileSync(DRAFTS,'utf8'));
+const d=useGallery
+  ? (()=>{const g=JSON.parse(fs.readFileSync(GDIR+'\\gallery-meta.json','utf8'));
+          return {title:g.title,body:g.body,topics:g.topics||[],gallery:g.pages,card:g.pages[0]};})()
+  : data.drafts[idx];
+if(!d||(!d.card&&!d.gallery)) throw new Error('没有草案或配图');
 
 // 整体兜底：8 分钟没结果就退出，别把流水线挂死
 const hard=setTimeout(()=>{console.error(JSON.stringify({ok:false,error:'整体超时（8 分钟）'}));process.exit(1);},8*60*1000);if(hard.unref)hard.unref();
@@ -72,7 +77,8 @@ await sleep(1200);
 const doc=await c.send('DOM.getDocument',{depth:-1},sessionId);
 const input=await c.send('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'input[type=file]'},sessionId);
 if(!input.nodeId)throw new Error('找不到 file input');
-await c.send('DOM.setFileInputFiles',{nodeId:input.nodeId,files:[d.card]},sessionId);
+const files=d.gallery||[d.card];
+await c.send('DOM.setFileInputFiles',{nodeId:input.nodeId,files},sessionId);
 for(let i=0;i<40;i++){await sleep(2000);text=String(await ev('document.body.innerText')||'');if(text.includes('添加作品描述')&&!text.includes('取消上传'))break;}
 
 await ev(`(()=>{const el=document.querySelector('input[placeholder="添加作品标题"]');if(!el)return false;const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,${JSON.stringify(d.title)});el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
@@ -121,15 +127,10 @@ if(shot1?.data)fs.writeFileSync(SHOT,Buffer.from(shot1.data,'base64'));
 const result={ok:true,title:d.title,topicsPicked:picked,declarationOpened:opened,declaration:decl,declarationConfirmed:confirmed,declarationShown:declShown,published:false,screenshot:SHOT};
 
 if(publish){
-  if(!decl||!decl.found){result.published=false;result.abort='声明没选上，拒绝发布';if(publish && result.published){
-  try{
-    const P='F:/program_all/dsh/dafeiyu/shared/published.json';
-    const arr=fs.existsSync(P)?JSON.parse(fs.readFileSync(P,'utf8')):[];
-    arr.push({date:new Date().toISOString().slice(0,10),title:d.title,body:d.body,topics:d.topics||[]});
-    fs.writeFileSync(P,JSON.stringify(arr,null,2));
-  }catch(e){/* 记录失败不影响发布 */}
-}
-console.log(JSON.stringify(result,null,2));process.exit(0);}
+  if(!decl||!decl.found){
+    result.published=false;result.abort='声明没选上，拒绝发布';
+    console.log(JSON.stringify(result,null,2));process.exit(0);
+  }
   const pub=await ev(`(()=>{const t=Array.from(document.querySelectorAll('button')).find(el=>(el.innerText||'').trim()==='发布');if(!t)return 'not-found';t.click();return 'clicked';})()`);
   await sleep(5000);
   const after=await ev(`({url:location.href,text:(document.body.innerText||'').replace(/\\s+/g,' ').slice(0,220)})`);
@@ -137,6 +138,33 @@ console.log(JSON.stringify(result,null,2));process.exit(0);}
   const out2='F:\\program_all\\dsh\\.dafeiyu-tweak\\published.png';
   if(shot2?.data)fs.writeFileSync(out2,Buffer.from(shot2.data,'base64'));
   result.publishClicked=pub;result.published=true;result.after=after;result.screenshot=out2;
+
+  // 只有真的按了发布才记账：published.json 追加一条、used-images.json 把这几张图记成今天用过。
+  // （排版阶段 compose_gallery 故意不记账，避免调样式就把图库烧光。）
+  if(pub==='clicked'){
+    try{
+      const P='F:/program_all/dsh/dafeiyu/shared/published.json';
+      const arr=fs.existsSync(P)?JSON.parse(fs.readFileSync(P,'utf8')):[];
+      // 用本地日期：toISOString 是 UTC，凌晨发会记成前一天
+      const now=new Date();
+      const rec={date:now.toLocaleDateString('sv-SE'),
+        published_at:now.toLocaleDateString('sv-SE')+' '+now.toTimeString().slice(0,5),
+        title:d.title,body:d.body,topics:d.topics||[],status:'审核中'};
+      if(useGallery){rec.kind='gallery';rec.images=(JSON.parse(fs.readFileSync(GDIR+'\\\\gallery-meta.json','utf8')).images)||[];}
+      arr.push(rec);
+      fs.writeFileSync(P,JSON.stringify(arr,null,2));
+    }catch(e){result.publishNote='published.json 写入失败：'+e.message}
+    if(useGallery){
+      try{
+        const U='F:/program_all/dsh/dafeiyu/shared/used-images.json';
+        const used=fs.existsSync(U)?JSON.parse(fs.readFileSync(U,'utf8')):{};
+        const imgs=(JSON.parse(fs.readFileSync(GDIR+'\\\\gallery-meta.json','utf8')).images)||[];
+        const today=new Date().toLocaleDateString('sv-SE');
+        for(const k of imgs) used[k]=today;
+        fs.writeFileSync(U,JSON.stringify(used,null,1));
+      }catch(e){result.publishNote=(result.publishNote||'')+' used-images 写入失败：'+e.message}
+    }
+  }
 }
 console.log(JSON.stringify(result,null,2));
 c.ws.close();
